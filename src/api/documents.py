@@ -13,6 +13,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 
 from .. import config, db, jobs, storage
@@ -179,3 +180,32 @@ def retry(doc_id: str, uid: str = Depends(user_id)):
     db.set_doc_status(doc_id, "pending", error=None)
     flow_run_id = jobs.enqueue_document(doc_id, uid)
     return {"doc_id": doc_id, "status": "pending", "flow_run_id": flow_run_id}
+
+
+_CONTENT_TYPES = {".pdf": "application/pdf",
+                  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation"}
+
+
+@router.get("/{doc_id}/file")
+def file(doc_id: str, u: str | None = None,
+         x_user_id: str | None = Header(default=None)):
+    """Serve the original document file — presigned redirect for cloud,
+    direct FileResponse for local storage."""
+    uid = (u or x_user_id or config.DEFAULT_USER_ID).strip()
+    if not _USER_RE.match(uid):
+        raise HTTPException(400, "Invalid user id.")
+    row = db.get_document(doc_id)
+    if row is None or row["user_id"] != uid:
+        raise HTTPException(404, "Document not found.")
+    key = row.get("storage_key")
+    if not key:
+        raise HTTPException(404, "No file stored for this document.")
+    if storage.presign_capable():
+        return RedirectResponse(storage.presign_get(key))
+    path = storage.local_path(key)
+    if not path.exists():
+        raise HTTPException(404, "Document file not found on disk.")
+    ext = Path(key).suffix.lower()
+    ct = _CONTENT_TYPES.get(ext, "application/octet-stream")
+    return FileResponse(path, media_type=ct,
+                        headers={"Content-Disposition": f'inline; filename="{row.get("filename", doc_id)}"'})

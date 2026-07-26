@@ -141,6 +141,7 @@ def retrieve(question: str, user_id: str, *, top_k: int | None = None,
         if kind in ("paper", "deck"):
             page = (tx or {}).get("page")
             slide = (tx or {}).get("slide")
+            fname = (meta or {}).get("filename", "")
             citations.append({
                 "n": i,
                 "video_id": vid,
@@ -148,6 +149,8 @@ def retrieve(question: str, user_id: str, *, top_k: int | None = None,
                 "kind": kind,
                 "page": page,
                 "slide": slide,
+                "filename": fname,
+                "file_url": f"/api/documents/{vid}/file?u={user_id}",
                 "score": round(w["rrf"], 4),
                 "transcript": (tx or {}).get("text"),
                 "modalities": sorted(w["modalities"]),
