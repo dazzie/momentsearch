@@ -436,7 +436,7 @@ function renderSources(){
       <div class="p-3">
         <div class="flex items-center gap-2 mb-1">
           <span class="text-[10px] font-bold text-white bg-coral rounded px-1.5 py-0.5">${c.n}</span>
-          <span class="text-[11px] text-muted">${esc(citeLocLabel(c))}</span>
+          ${c.file_url?`<a href="${esc(c.file_url)}" target="_blank" class="text-[11px] text-coral2 hover:underline" onclick="event.stopPropagation()">${esc(citeLocLabel(c))} ↗</a>`:`<span class="text-[11px] text-muted">${esc(citeLocLabel(c))}</span>`}
           ${tags}${kindTag}
           <span class="text-[11px] text-muted ml-auto">score ${c.score}</span>
         </div>
@@ -471,9 +471,10 @@ function playCitation(n){
     } else {
       box.innerHTML=`<div class="w-full h-full flex items-center justify-center p-8 bg-paper2">
         <div class="max-w-lg text-center">
-          <div class="text-xs font-semibold text-muted mb-2">${esc(c.kind.toUpperCase())} · ${esc(loc)}</div>
+          ${fileUrl!=="#"?`<a href="${esc(fileUrl)}" target="_blank" class="text-2xl font-bold text-coral2 hover:text-coral transition">${esc(loc)} ↗</a>`:`<div class="text-2xl font-bold text-muted">${esc(loc)}</div>`}
+          <div class="text-xs font-semibold text-muted mt-1 mb-4">${esc(c.kind.toUpperCase())} · Best match</div>
           <div class="text-sm leading-relaxed text-ink mb-4">${esc(c.transcript||"(no text extracted)")}</div>
-          ${fileUrl!=="#"?`<a href="${esc(fileUrl)}" target="_blank" class="inline-block px-4 py-2 bg-coral text-white rounded-lg text-sm font-semibold hover:bg-coral2 transition">Download &amp; open ${esc(loc)} ↗</a>`:""}
+          ${fileUrl!=="#"?`<a href="${esc(fileUrl)}" target="_blank" class="inline-block px-4 py-2 bg-coral text-white rounded-lg text-sm font-semibold hover:bg-coral2 transition">Download full deck ↗</a>`:""}
         </div></div>`;
     }
     $("#mFrame").style.display="none";
