@@ -5,12 +5,12 @@
 🌐 **Live app:** [momentsearch.fly.dev](https://momentsearch.fly.dev/get-started)
 
 MomentSearch is an open-source, production-shaped stack for **visual** video
-search and RAG. Users upload videos (or paste YouTube URLs); background workers
-sample keyframes, dedup them, embed them with CLIP and index them per-user in
-[Qdrant](https://qdrant.tech). Ask a question and it retrieves the most
-relevant moments and (optionally) has **your own vision LLM** read those
-frames and write a cited answer — or honestly abstain when the evidence isn't
-there.
+search and RAG. Users upload videos (or paste YouTube URLs), **papers (PDF)**
+or **slide decks (PDF/PPTX)**; background workers sample keyframes, dedup them,
+embed them with CLIP and index them per-user in [Qdrant](https://qdrant.tech).
+Ask a question and it retrieves the most relevant moments — across videos *and*
+documents — and (optionally) has **your own vision LLM** read those frames and
+write a cited answer — or honestly abstain when the evidence isn't there.
 
 > **Visual-first, multimodal for YouTube.** The core is *visual* — CLIP over
 > sampled frames, so it works on silent footage, screen recordings, sports,
@@ -27,6 +27,7 @@ there.
 - 💬 **Cited answers** — bring your own vision LLM (OpenAI-compatible, NVIDIA, or Anthropic)
 - 🏠 **Per-user models** — each tenant can plug in a model *they* host (vLLM, Ollama, any OpenAI-compatible endpoint) and their answers run on it
 - 🧩 **Multimodal fusion** — for YouTube, a transcript branch runs alongside the visual one and a **rank-based scoring module** (RRF + time-windows + cross-modal boost) fuses them; "find where they *talk about* X" works even when the screen doesn't show it
+- 📄 **Documents** — PDF papers and PPTX decks ingest through the same queue, embed as text chunks with page/slide metadata, and rank alongside videos in search results with **cross-source citations** (page numbers, slide numbers, timestamps)
 - 🔓 **Apache 2.0**
 
 ## Architecture
@@ -126,7 +127,7 @@ Two pages, one app:
 | Page | What it is |
 |---|---|
 | **`/`** | **Sample project — "A Deep Dive into LLMs."** Four LLM talks, pre-indexed, read-only. |
-| **`/get-started`** | **Bring your own videos.** Add a YouTube URL or upload a file, then ask. |
+| **`/get-started`** | **Bring your own sources.** Add a YouTube URL, upload a video, or upload a document (PDF/PPTX), then ask. |
 
 **The sample corpus is a startup gate.** A one-shot `seed` service indexes the
 four talks and must finish before `api`/`worker` start — so when
@@ -184,6 +185,31 @@ python -m src.seed                        # one-shot: index the 4 samples
 
 Poll `GET /api/videos` (or watch the UI chips) until `indexed`.
 
+### Document write path (papers + decks)
+
+Documents share the same presign → upload → register → worker pattern, with
+their own Prefect deployment (`ms-ingest-document/ingest-doc`):
+
+1. **Presign** — `POST /api/documents/presign {filename, content_type, size}`.
+   Accepts PDF (`application/pdf`) and PPTX
+   (`application/vnd.openxmlformats-officedocument.presentationml.presentation`).
+2. **Upload** — browser PUTs straight to `documents/{user}/{doc_id}.{ext}`.
+3. **Register** — `POST /api/documents {doc_id, key, title?}`. Auto-detects
+   `kind` (`paper` for `.pdf`, `deck` for `.pptx`) from the extension, or
+   accepts an explicit override.
+4. **Worker** (per document):
+   - **parse** — PDF papers are parsed with PyMuPDF into page-aware chunks
+     (~500 words each, never splitting mid-sentence, tagged with page number).
+     PPTX decks extract one chunk per slide (title + body + notes), tagged with
+     slide number. PDF decks also produce one chunk per page.
+   - **embed** — text chunks go through the same bge/OpenAI text embedder used
+     for YouTube transcripts, then upsert to the `moments_text` Qdrant
+     collection with `kind`, `page`/`slide`, and `doc_id` in the payload.
+
+Poll `GET /api/documents` until `indexed`. Clicking a document citation in the
+UI opens the original PDF at the matched page (browser's native viewer with
+`#page=N`) or offers a download link for PPTX files.
+
 ## The read path — question to answer-or-abstain
 
 `POST /api/ask {question, video_id?}`:
@@ -219,7 +245,9 @@ Poll `GET /api/videos` (or watch the UI chips) until `indexed`.
    cite `[n]`, or say so. Citations are validated; invented references stripped.
 5. **Answer** — clickable thumbnails + timestamps (presigned GETs straight from
    the bucket). Every timestamp is read from the winning hit's payload — the LLM
-   never invents one — or the honest refusal.
+   never invents one — or the honest refusal. **Document citations** show page
+   or slide numbers instead of timestamps, with a `kind` badge (`paper`/`deck`)
+   and a link to open the original file at the matched location.
 
 The cost fact that drives this shape: retrieval is ~10-30ms; the multimodal
 LLM call is seconds and dominates cost. Optimize there — few moments,
@@ -463,6 +491,25 @@ curl -X POST localhost:8000/api/ask -H "Content-Type: application/json" \
   -d '{"question":"a diagram of the attention mechanism"}'
 ```
 
+### Document endpoints
+
+```bash
+# 1) presign
+curl -X POST localhost:8000/api/documents/presign \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"filename":"paper.pdf","content_type":"application/pdf","size":1234567}'
+# 2) PUT the file to the returned url, then 3) register:
+curl -X POST localhost:8000/api/documents \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"doc_id":"doc_ab12cd34ef","key":"documents/default/doc_ab12cd34ef.pdf","title":"My Paper"}'
+
+# status / retry / delete / file
+curl localhost:8000/api/documents
+curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8000/api/documents/doc_ab12cd34ef/retry
+curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8000/api/documents/doc_ab12cd34ef
+curl localhost:8000/api/documents/doc_ab12cd34ef/file   # serves the original PDF/PPTX
+```
+
 Public: `GET /` (sample UI) · `GET /get-started` · `GET /api/config` ·
 `GET /api/health`.
 
@@ -486,7 +533,7 @@ the four entrypoints as top-level modules in the package.
 │   └── quickstart.py        manual in-process seed + terminal query demo
 └── src/                     ── entrypoints ──────────────────────────────────
     ├── app.py               unified FastAPI app — videos + search routers, one port
-    ├── worker.py            Prefect worker — serves "ms-ingest-video/ingest"
+    ├── worker.py            Prefect worker — serves video + document deployments
     ├── clip_service.py      CLIP inference service — one warm model behind a URL
     ├── seed.py              startup gate — indexes the 4 samples, then exits
     │                        ── core ──────────────────────────────────────────
@@ -500,6 +547,7 @@ the four entrypoints as top-level modules in the package.
     ├── seeding.py           blocking seed-to-completion logic (used by seed.py)
     ├── api/
     │   ├── videos.py        write path: presign, register, status, retry, delete
+    │   ├── documents.py     document write path: presign, register, status, file serving
     │   └── search.py        read path: /api/ask, /api/llm, config, media, UI
     ├── dispatcher.py        WFQ: fair round-robin admission of pending videos
     ├── ingest/
@@ -507,7 +555,10 @@ the four entrypoints as top-level modules in the package.
     │   ├── frames.py        ffmpeg pipe-to-memory sampling (interval | scene)
     │   ├── dedup.py         perceptual-hash dedup (before CLIP spends compute)
     │   ├── transcript.py    YouTube captions → time-chunks (the text branch)
-    │   └── pipeline.py      the Prefect flow: fetch → sample → embed/index → transcript
+    │   ├── pipeline.py      the Prefect flow: fetch → sample → embed/index → transcript
+    │   ├── doc_pipeline.py  Prefect flow for documents: fetch → parse → embed → upsert
+    │   ├── paper.py         PDF paper parser (PyMuPDF, ~500-word page-aware chunks)
+    │   └── deck.py          slide deck parser (PPTX slides or PDF pages, one chunk each)
     └── rag/
         ├── embeddings.py    CLIP image+text + transcript (bge or OpenAI) — in-proc/remote
         ├── vector_store.py  multi-tenant Qdrant: visual + text collections, int8/on-disk
