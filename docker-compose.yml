@@ -7,6 +7,14 @@
 # Vector store is Qdrant Cloud via QDRANT_URL in .env. To run a local Qdrant
 # instead, add a qdrant service here and blank QDRANT_URL.
 services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+
   # The inference service: ONE warm CLIP model behind a URL. api + worker send
   # batches here instead of each flow run paying a fresh ~15-30s model load.
   # Scaling embedding = scaling THIS service (CPU here; same container on a
@@ -31,11 +39,13 @@ services:
     env_file: .env
     environment:
       CLIP_SERVICE_URL: ${CLIP_SERVICE_URL:-http://clip:8001}
+      QDRANT_URL: http://qdrant:6333
     volumes:
       - ./data:/app/data
       - hf_cache:/root/.cache
     depends_on:
       - clip
+      - qdrant
     restart: "no"
 
   api:
@@ -45,6 +55,7 @@ services:
     env_file: .env
     environment:
       CLIP_SERVICE_URL: ${CLIP_SERVICE_URL:-http://clip:8001}
+      QDRANT_URL: http://qdrant:6333
     volumes:
       - ./data:/app/data          # STORAGE_PROVIDER=local only (dev)
       - hf_cache:/root/.cache
@@ -61,6 +72,7 @@ services:
     env_file: .env
     environment:
       CLIP_SERVICE_URL: ${CLIP_SERVICE_URL:-http://clip:8001}
+      QDRANT_URL: http://qdrant:6333
       # One worker process executes up to WORKER_CONCURRENCY runs at once.
       # With the clip service doing the embedding, each run is light
       # (download + ffmpeg only) — raise this without adding RAM for models.
@@ -79,3 +91,4 @@ services:
 
 volumes:
   hf_cache:
+  qdrant_data:
