@@ -13,6 +13,7 @@ from __future__ import annotations
 from prefect.deployments import run_deployment
 
 INGEST_DEPLOYMENT = "ms-ingest-video/ingest"
+DOC_DEPLOYMENT = "ms-ingest-document/ingest-doc"
 
 
 def enqueue_video(video_id: str, user_id: str) -> str:
@@ -20,7 +21,18 @@ def enqueue_video(video_id: str, user_id: str) -> str:
     flow_run = run_deployment(
         name=INGEST_DEPLOYMENT,
         parameters={"video_id": video_id, "user_id": user_id},
-        timeout=0,  # fire-and-forget: don't block the API waiting for the run
+        timeout=0,
         flow_run_name=f"ingest-{video_id}",
+    )
+    return str(flow_run.id)
+
+
+def enqueue_document(doc_id: str, user_id: str) -> str:
+    """Schedule the ingest flow for one document. Returns the Prefect flow-run id."""
+    flow_run = run_deployment(
+        name=DOC_DEPLOYMENT,
+        parameters={"doc_id": doc_id, "user_id": user_id},
+        timeout=0,
+        flow_run_name=f"ingest-{doc_id}",
     )
     return str(flow_run.id)

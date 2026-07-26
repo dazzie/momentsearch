@@ -101,6 +101,10 @@ PRESIGN_EXPIRY_S = _int("PRESIGN_EXPIRY_S", 900)          # presigned PUT lifeti
 PRESIGN_GET_EXPIRY_S = _int("PRESIGN_GET_EXPIRY_S", 3600)  # thumbnails / playback
 MAX_UPLOAD_MB = _int("MAX_UPLOAD_MB", 2048)                # register rejects bigger objects
 ALLOWED_UPLOAD_TYPES = ("video/",)                         # content-type must start with
+ALLOWED_DOC_TYPES = ("application/pdf",
+                     "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+DOC_KEY_PREFIX = "documents/"
+DOC_STATUSES = ("pending", "queued", "parsing", "embedding", "indexed", "failed")
 
 # --- Video ingest lifecycle ---------------------------------------------------
 # pending  = registered, waiting in our fair queue (not yet sent to Prefect)

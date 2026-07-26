@@ -126,42 +126,72 @@ def retrieve(question: str, user_id: str, *, top_k: int | None = None,
         best_text = thits[0]["score"] if thits else 0.0
 
     windows = _fuse(vhits, thits)[:k]
-    videos = db.videos_by_ids(sorted({w["video_id"] for w in windows}))
+    all_ids = sorted({w["video_id"] for w in windows})
+    video_ids_set = [i for i in all_ids if not i.startswith("doc_")]
+    doc_ids_set = [i for i in all_ids if i.startswith("doc_")]
+    meta_map = {**db.videos_by_ids(video_ids_set), **db.docs_by_ids(doc_ids_set)}
+
     citations = []
     for i, w in enumerate(windows, 1):
         vid = w["video_id"]
-        meta = videos.get(vid)
+        meta = meta_map.get(vid)
         fr, tx = w["frame"], w["text"]
-        # Anchor on the frame's exact timestamp when there is one (precise visual
-        # seek); otherwise the transcript chunk's start.
-        ms = int(fr["ms"]) if fr else int(w["t"] * 1000)
-        idx = int(fr["idx"]) if fr else None
-        citations.append({
-            "n": i,
-            "video_id": vid,
-            "title": (meta or {}).get("title") or vid,
-            "url": (meta or {}).get("url"),
-            "source": (meta or {}).get("source"),
-            "ms": ms,
-            "timestamp": _seconds(ms),
-            "idx": idx,
-            "thumbnail": _thumb_url(user_id, vid, idx) if idx is not None else None,
-            "media_url": _media_url(meta, user_id, vid),
-            "deeplink": _deeplink(meta, vid, ms),
-            "score": round(w["rrf"], 4),
-            "transcript": (tx or {}).get("text"),
-            "modalities": sorted(w["modalities"]),
-        })
+        kind = (tx or {}).get("kind") or ((meta or {}).get("kind"))
+
+        if kind in ("paper", "deck"):
+            page = (tx or {}).get("page")
+            slide = (tx or {}).get("slide")
+            citations.append({
+                "n": i,
+                "video_id": vid,
+                "title": (meta or {}).get("title") or vid,
+                "kind": kind,
+                "page": page,
+                "slide": slide,
+                "score": round(w["rrf"], 4),
+                "transcript": (tx or {}).get("text"),
+                "modalities": sorted(w["modalities"]),
+            })
+        else:
+            ms = int(fr["ms"]) if fr else int(w["t"] * 1000)
+            idx = int(fr["idx"]) if fr else None
+            citations.append({
+                "n": i,
+                "video_id": vid,
+                "title": (meta or {}).get("title") or vid,
+                "kind": "video",
+                "url": (meta or {}).get("url"),
+                "source": (meta or {}).get("source"),
+                "ms": ms,
+                "timestamp": _seconds(ms),
+                "idx": idx,
+                "thumbnail": _thumb_url(user_id, vid, idx) if idx is not None else None,
+                "media_url": _media_url(meta, user_id, vid),
+                "deeplink": _deeplink(meta, vid, ms),
+                "score": round(w["rrf"], 4),
+                "transcript": (tx or {}).get("text"),
+                "modalities": sorted(w["modalities"]),
+            })
     return {"citations": citations, "best_visual": best_visual, "best_text": best_text}
 
 
+def _cite_loc(c: dict) -> str:
+    kind = c.get("kind", "video")
+    if kind == "paper":
+        return f"p.{c.get('page', '?')}"
+    if kind == "deck":
+        return f"slide {c.get('slide', '?')}"
+    return c.get("timestamp", "?")
+
+
 def _fallback_answer(citations: list[dict[str, Any]]) -> str:
-    """No-LLM summary: rank the visually-closest moments. Honest about being
+    """No-LLM summary: rank the closest moments. Honest about being
     similarity, not synthesis."""
     top = citations[0]
-    where = f"{top['title']} at {top['timestamp']}" if top.get("title") else top["timestamp"]
-    others = ", ".join(f"{c['timestamp']} [{c['n']}]" for c in citations[1:4])
-    msg = f"Closest visual match: {where} [{top['n']}] (similarity {top['score']})."
+    loc = _cite_loc(top)
+    where = f"{top['title']} at {loc}" if top.get("title") else loc
+    others = ", ".join(f"{_cite_loc(c)} [{c['n']}]" for c in citations[1:4])
+    msg = f"Closest match: {where} [{top['n']}] (similarity {top['score']})."
     if others:
         msg += f" Other relevant moments: {others}."
     return msg

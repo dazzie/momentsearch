@@ -56,6 +56,28 @@ CREATE INDEX IF NOT EXISTS ms_videos_user_idx   ON ms_videos (user_id, created_a
 CREATE INDEX IF NOT EXISTS ms_videos_status_idx ON ms_videos (status);
 CREATE INDEX IF NOT EXISTS ms_videos_hash_idx   ON ms_videos (user_id, source_hash);
 
+-- Documents (papers + decks) — same lifecycle as videos but text-only.
+CREATE TABLE IF NOT EXISTS ms_documents (
+    id           TEXT PRIMARY KEY,               -- doc_<uuid_hex>
+    user_id      TEXT NOT NULL,
+    kind         TEXT NOT NULL,                  -- paper | deck
+    title        TEXT,
+    filename     TEXT,
+    storage_key  TEXT,                           -- documents/<user>/<id>.<ext>
+    source_hash  TEXT,                           -- sha256 of the uploaded file
+    status       TEXT NOT NULL DEFAULT 'pending',
+    error        TEXT,
+    chunk_count  INT,
+    progress     REAL,
+    attempts     INT NOT NULL DEFAULT 0,
+    embed_version TEXT,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ms_documents_user_idx   ON ms_documents (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS ms_documents_status_idx ON ms_documents (status);
+CREATE INDEX IF NOT EXISTS ms_documents_hash_idx   ON ms_documents (user_id, source_hash);
+
 -- Bring-your-own-model: a tenant's hosted LLM endpoint (vLLM / Ollama / any
 -- OpenAI-compatible server, NVIDIA NIM, or Anthropic). When a row exists the
 -- read path answers with THIS model instead of the server's LLM_* env config.
@@ -257,3 +279,96 @@ def set_user_llm(user_id: str, *, provider: str, model: str,
 def delete_user_llm(user_id: str) -> None:
     with pool().connection() as conn:
         conn.execute("DELETE FROM ms_user_llms WHERE user_id = %s", (user_id,))
+
+
+# ── Documents (papers + decks) ─────────────────────────────────────────────────
+
+def upsert_pending_doc(doc: dict[str, Any]) -> dict:
+    with pool().connection() as conn:
+        row = conn.execute(
+            """
+            INSERT INTO ms_documents (id, user_id, kind, title, filename, storage_key, source_hash, status)
+            VALUES (%(id)s, %(user_id)s, %(kind)s, %(title)s, %(filename)s,
+                    %(storage_key)s, %(source_hash)s, 'pending')
+            ON CONFLICT (id) DO UPDATE SET
+                title = COALESCE(EXCLUDED.title, ms_documents.title),
+                storage_key = COALESCE(EXCLUDED.storage_key, ms_documents.storage_key),
+                source_hash = COALESCE(EXCLUDED.source_hash, ms_documents.source_hash),
+                status = 'pending', error = NULL, progress = NULL, updated_at = now()
+            RETURNING *
+            """,
+            doc,
+        ).fetchone()
+    return row
+
+
+def set_doc_status(doc_id: str, status: str, *, error: str | None = None,
+                   chunk_count: int | None = None, embed_version: str | None = None,
+                   progress: float | None = None) -> None:
+    with pool().connection() as conn:
+        conn.execute(
+            """
+            UPDATE ms_documents SET status = %s, error = %s,
+                chunk_count = COALESCE(%s, chunk_count),
+                embed_version = COALESCE(%s, embed_version),
+                progress = %s, updated_at = now()
+            WHERE id = %s
+            """,
+            (status, error, chunk_count, embed_version, progress, doc_id),
+        )
+
+
+def set_doc_progress(doc_id: str, progress: float) -> None:
+    with pool().connection() as conn:
+        conn.execute("UPDATE ms_documents SET progress = %s, updated_at = now() WHERE id = %s",
+                     (round(progress, 3), doc_id))
+
+
+def bump_doc_attempts(doc_id: str) -> int:
+    with pool().connection() as conn:
+        row = conn.execute(
+            "UPDATE ms_documents SET attempts = attempts + 1, updated_at = now() WHERE id = %s RETURNING attempts",
+            (doc_id,),
+        ).fetchone()
+    return row["attempts"] if row else 0
+
+
+def get_document(doc_id: str) -> dict | None:
+    with pool().connection() as conn:
+        return conn.execute("SELECT * FROM ms_documents WHERE id = %s", (doc_id,)).fetchone()
+
+
+def find_doc_duplicate(user_id: str, source_hash: str, exclude_id: str) -> dict | None:
+    with pool().connection() as conn:
+        return conn.execute(
+            """
+            SELECT * FROM ms_documents
+            WHERE user_id = %s AND source_hash = %s AND id <> %s AND status = 'indexed'
+            LIMIT 1
+            """,
+            (user_id, source_hash, exclude_id),
+        ).fetchone()
+
+
+def list_documents(user_id: str, status: str | None = None) -> list[dict]:
+    q = "SELECT * FROM ms_documents WHERE user_id = %s"
+    params: list = [user_id]
+    if status:
+        q += " AND status = %s"
+        params.append(status)
+    q += " ORDER BY created_at DESC"
+    with pool().connection() as conn:
+        return conn.execute(q, tuple(params)).fetchall()
+
+
+def docs_by_ids(ids: list[str]) -> dict[str, dict]:
+    if not ids:
+        return {}
+    with pool().connection() as conn:
+        rows = conn.execute("SELECT * FROM ms_documents WHERE id = ANY(%s)", (ids,)).fetchall()
+    return {r["id"]: r for r in rows}
+
+
+def delete_document(doc_id: str) -> None:
+    with pool().connection() as conn:
+        conn.execute("DELETE FROM ms_documents WHERE id = %s", (doc_id,))
