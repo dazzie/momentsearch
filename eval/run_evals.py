@@ -722,10 +722,10 @@ def eval_decoupling():
         record("Search latency during ingest", "perf", False,
                f"couldn't start ingest: {msg}")
 
-    # 4.3 Accept latency p95 — register POST only (not upload)
-    accept_times = []
-    for i in range(5):
-        pdf = make_test_pdf(1)
+    # 4.3 Accept latency p95 — register POST only (pre-stage uploads first)
+    pdf = make_test_pdf(1)
+    staged = []
+    for i in range(10):
         r_pre = api("POST", "/api/documents/presign",
                     json={"filename": f"accept_{i}.pdf",
                           "content_type": "application/pdf",
@@ -736,16 +736,28 @@ def eval_decoupling():
         put_url = p["url"] if p["url"].startswith("http") else BASE_URL + p["url"]
         requests.put(put_url, headers={**p["headers"], "X-User-Id": EVAL_USER},
                      data=pdf, timeout=30)
+        staged.append(p)
+
+    # Warm the DB pool, then burst register calls
+    accept_times = []
+    for i, p in enumerate(staged):
         t0 = time.time()
         api("POST", "/api/documents",
             json={"doc_id": p["doc_id"], "key": p["key"], "title": f"Accept {i}"})
         accept_times.append((time.time() - t0) * 1000)
+
+    # Cleanup
+    for p in staged:
         api("DELETE", f"/api/documents/{p['doc_id']}")
+
     if accept_times:
-        p95 = sorted(accept_times)[int(len(accept_times) * 0.95)]
-        record("Accept latency p95 (5 samples)", "perf",
+        accept_times.sort()
+        p95_idx = int(len(accept_times) * 0.95)
+        p95 = accept_times[min(p95_idx, len(accept_times) - 1)]
+        median = accept_times[len(accept_times) // 2]
+        record("Accept latency p95 (10 samples)", "perf",
                p95 <= SLA["accept_latency_p95_ms"],
-               f"p95={p95:.0f}ms (target ≤{SLA['accept_latency_p95_ms']}ms)",
+               f"p95={p95:.0f}ms median={median:.0f}ms (target ≤{SLA['accept_latency_p95_ms']}ms)",
                kpi_name="accept_latency_p95", kpi_value=p95)
 
 
