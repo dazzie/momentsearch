@@ -154,20 +154,24 @@ def _label(i: int, m: dict) -> str:
     return line
 
 
-def _answer_openai(cfg: LLMConfig, question: str, moments: list[dict]) -> str:
-    from openai import OpenAI
-
-    client = OpenAI(api_key=cfg.api_key or "not-needed", base_url=_base_url(cfg))
+def _openai_messages(cfg: LLMConfig, question: str, moments: list[dict]) -> list[dict]:
     content: list[dict] = [{"type": "text", "text": _intro(question, len(moments))}]
     for i, m in enumerate(moments, 1):
         content.append({"type": "text", "text": _label(i, m)})
         if m.get("image"):
             uri = f"data:image/jpeg;base64,{base64.b64encode(_downscale(m['image'])).decode()}"
             content.append({"type": "image_url", "image_url": {"url": uri}})
+    return [{"role": "system", "content": SYSTEM},
+            {"role": "user", "content": content}]
+
+
+def _answer_openai(cfg: LLMConfig, question: str, moments: list[dict]) -> str:
+    from openai import OpenAI
+
+    client = OpenAI(api_key=cfg.api_key or "not-needed", base_url=_base_url(cfg))
     resp = client.chat.completions.create(
         model=cfg.model,
-        messages=[{"role": "system", "content": SYSTEM},
-                  {"role": "user", "content": content}],
+        messages=_openai_messages(cfg, question, moments),
         temperature=0.2,
         max_tokens=cfg.max_tokens,
     )
@@ -192,3 +196,51 @@ def _answer_anthropic(cfg: LLMConfig, question: str, moments: list[dict]) -> str
         messages=[{"role": "user", "content": blocks}],
     )
     return "".join(b.text for b in resp.content if b.type == "text").strip()
+
+
+# ── Streaming variants ──────────────────────────────────────────────────────
+
+def answer_stream(question: str, moments: list[dict], cfg: LLMConfig):
+    """Yield answer tokens one at a time (generator of str chunks)."""
+    if cfg.provider == "anthropic":
+        yield from _stream_anthropic(cfg, question, moments)
+    else:
+        yield from _stream_openai(cfg, question, moments)
+
+
+def _stream_openai(cfg: LLMConfig, question: str, moments: list[dict]):
+    from openai import OpenAI
+
+    client = OpenAI(api_key=cfg.api_key or "not-needed", base_url=_base_url(cfg))
+    stream = client.chat.completions.create(
+        model=cfg.model,
+        messages=_openai_messages(cfg, question, moments),
+        temperature=0.2,
+        max_tokens=cfg.max_tokens,
+        stream=True,
+    )
+    for chunk in stream:
+        delta = chunk.choices[0].delta if chunk.choices else None
+        if delta and delta.content:
+            yield delta.content
+
+
+def _stream_anthropic(cfg: LLMConfig, question: str, moments: list[dict]):
+    import anthropic
+
+    client = anthropic.Anthropic(api_key=cfg.api_key, base_url=cfg.base_url or None)
+    blocks: list[dict] = [{"type": "text", "text": _intro(question, len(moments))}]
+    for i, m in enumerate(moments, 1):
+        blocks.append({"type": "text", "text": _label(i, m)})
+        if m.get("image"):
+            blocks.append({"type": "image", "source": {
+                "type": "base64", "media_type": "image/jpeg",
+                "data": base64.b64encode(_downscale(m["image"])).decode()}})
+    with client.messages.stream(
+        model=cfg.model,
+        max_tokens=cfg.max_tokens,
+        system=SYSTEM,
+        messages=[{"role": "user", "content": blocks}],
+    ) as stream:
+        for text in stream.text_stream:
+            yield text

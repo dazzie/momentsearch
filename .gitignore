@@ -26,8 +26,9 @@ qdrant_storage/
 node_modules/
 dist/
 
-# Benchmark
-benchmark/
+# Benchmark output (keep bench.py tracked)
+benchmark/*.json
+benchmark/*.csv
 
 # Internal design notes (not published)
 MULTIMODAL_RETRIEVAL.md

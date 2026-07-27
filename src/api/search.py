@@ -148,6 +148,64 @@ def ask(req: AskRequest, x_user_id: str | None = Header(default=None)):
                           video_ids=video_ids)
 
 
+@router.post("/api/ask_stream")
+def ask_stream(req: AskRequest, x_user_id: str | None = Header(default=None)):
+    """SSE streaming variant of /api/ask. Events:
+      - event: citations  (JSON array of citation objects)
+      - event: token      (incremental answer text)
+      - event: done       (final metadata)
+      - event: error      (on failure)
+    """
+    import json as _json
+
+    if not req.question.strip():
+        raise HTTPException(400, "Empty question.")
+    uid = _uid(x_user_id)
+    video_ids = req.video_ids or None
+    question = req.question.strip()
+
+    def generate():
+        try:
+            r = rag_search.retrieve(question, uid, top_k=req.top_k,
+                                    video_id=req.video_id, video_ids=video_ids)
+            citations = r["citations"]
+            yield f"event: citations\ndata: {_json.dumps(citations)}\n\n"
+
+            if not citations:
+                yield f"event: token\ndata: {_json.dumps('No relevant moments were found.')}\n\n"
+                yield f"event: done\ndata: {_json.dumps({'llm_used': False, 'abstained': True})}\n\n"
+                return
+
+            visual_ok = r["best_visual"] >= config.CONFIDENCE_THRESHOLD
+            text_ok = r["best_text"] >= config.TEXT_CONFIDENCE_THRESHOLD
+            if config.CONFIDENCE_THRESHOLD and not visual_ok and not text_ok:
+                yield f"event: token\ndata: {_json.dumps(rag_search.ABSTAIN)}\n\n"
+                yield f"event: done\ndata: {_json.dumps({'llm_used': False, 'abstained': True})}\n\n"
+                return
+
+            cfg, source = rag_search.resolve_llm(uid)
+            if cfg is None:
+                fallback = rag_search._fallback_answer(citations)
+                yield f"event: token\ndata: {_json.dumps(fallback)}\n\n"
+                yield f"event: done\ndata: {_json.dumps({'llm_used': False})}\n\n"
+                return
+
+            moments = rag_search._build_moments(uid, citations)
+            full_answer = ""
+            for token in llm.answer_stream(question, moments, cfg):
+                full_answer += token
+                yield f"event: token\ndata: {_json.dumps(token)}\n\n"
+
+            validated = rag_search._validate_citations(full_answer, len(citations))
+            yield f"event: done\ndata: {_json.dumps({'llm_used': True, 'llm_source': source, 'llm_model': cfg.model, 'answer': validated})}\n\n"
+        except Exception as exc:
+            yield f"event: error\ndata: {_json.dumps({'error': str(exc)})}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache",
+                                      "X-Accel-Buffering": "no"})
+
+
 # ── Media (local-dev only; buckets serve these via presigned URLs) ───────────
 
 @router.get("/api/frame/{video_id}/{name}")

@@ -488,8 +488,12 @@ curl localhost:8000/api/videos
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8000/api/videos/up_ab12cd34ef/retry
 curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8000/api/videos/up_ab12cd34ef
 
-# ask
+# ask (JSON response)
 curl -X POST localhost:8000/api/ask -H "Content-Type: application/json" \
+  -d '{"question":"a diagram of the attention mechanism"}'
+
+# ask (SSE streaming — citations first, then answer tokens)
+curl -N -X POST localhost:8000/api/ask_stream -H "Content-Type: application/json" \
   -d '{"question":"a diagram of the attention mechanism"}'
 ```
 
@@ -546,6 +550,10 @@ the four entrypoints as top-level modules in the package.
 │       └── fly-deploy.yml   CI: deploy to Fly on push to dev
 ├── ui/
 │   └── index.html           single-file web UI (presigned upload, status poll, player)
+├── eval/
+│   └── run_evals.py         36-eval suite (API, ingest, search, perf)
+├── benchmark/
+│   └── bench.py             latency/throughput/resilience benchmarks
 ├── examples/
 │   └── quickstart.py        manual in-process seed + terminal query demo
 └── src/                     ── entrypoints ──────────────────────────────────
@@ -597,13 +605,26 @@ Four categories:
 
 | Category | Count | What it covers |
 |---|---|---|
-| **API contracts** | 14 | Health, config, list/404/400/415/413, file serving, presign, register 202 |
+| **API contracts** | 19 | Health, config, list/404/400/415/413, file serving, presign, register 202, admin sources, SSE stream |
 | **Ingest pipeline** | 5 | PDF paper, PPTX deck, MP4 video, CRUD lifecycle, duplicate detection |
 | **Search functional** | 9 | P@5, MRR, cross-source ranking, recall@10, grounded responses, citation completeness, multi-source fusion, score ordering |
 | **Performance** | 3 | Idle search latency, search during ingest, accept latency p95 |
 
 KPIs tracked: **P@5 ≥ 0.6**, **MRR ≥ 0.5**, **recall@10 ≥ 0.8**, **accept
 latency p95 < 500ms**, **search/ingest ratio > 10×**.
+
+## Benchmark
+
+`benchmark/bench.py` measures latency percentiles, throughput (QPS), and
+accept latency under concurrent load. The `--resilience` flag adds stress
+tests: search during active ingest, burst concurrent registrations, mixed
+read/write operations, recovery after bad requests, and SSE stream validation.
+
+```bash
+python benchmark/bench.py                          # latency + throughput
+python benchmark/bench.py --resilience             # + resilience tests
+python benchmark/bench.py --concurrency 20 --rounds 100  # tune load
+```
 
 ## Security notes (presigned uploads)
 

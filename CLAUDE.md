@@ -24,6 +24,10 @@ python -m src.seed                            # one-shot sample seeder
 # Eval suite (requires running API at localhost:8000)
 python eval/run_evals.py
 
+# Benchmark (latency, throughput, resilience)
+python benchmark/bench.py                  # default: latency + throughput
+python benchmark/bench.py --resilience     # adds resilience tests
+
 # Syntax check
 python -m py_compile src/**/*.py
 ```

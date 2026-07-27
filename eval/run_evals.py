@@ -397,6 +397,25 @@ def eval_api_contracts():
     record("Admin missing source → 404", "api", r.status_code == 404,
            f"got {r.status_code}")
 
+    # 1.19 SSE /api/ask_stream returns valid event stream
+    try:
+        r = requests.post(BASE_URL + "/api/ask_stream",
+                          headers={"X-User-Id": DEFAULT_USER,
+                                   "Content-Type": "application/json"},
+                          json={"question": "What is deep learning?"},
+                          stream=True, timeout=30)
+        events = []
+        if r.status_code == 200:
+            for line in r.iter_lines(decode_unicode=True):
+                if line and line.startswith("event:"):
+                    events.append(line.split(":", 1)[1].strip())
+        has_all = "citations" in events and "token" in events and "done" in events
+        record("SSE /api/ask_stream", "api",
+               r.status_code == 200 and has_all,
+               f"events={events[:5]}")
+    except Exception as e:
+        record("SSE /api/ask_stream", "api", False, str(e))
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CATEGORY 2: INGEST PIPELINE EVALS
