@@ -9,6 +9,7 @@ Upload flow (same presign pattern as videos):
 from __future__ import annotations
 
 import re
+import threading
 import uuid
 from pathlib import Path
 
@@ -133,8 +134,9 @@ def register(req: RegisterRequest, uid: str = Depends(user_id)):
         "storage_key": req.key, "source_hash": None,
     })
 
-    flow_run_id = jobs.enqueue_document(row["id"], uid)
-    return {"doc_id": row["id"], "status": row["status"], "flow_run_id": flow_run_id}
+    threading.Thread(target=jobs.enqueue_document, args=(row["id"], uid),
+                     daemon=True).start()
+    return {"doc_id": row["id"], "status": row["status"]}
 
 
 # ── Status / lifecycle ────────────────────────────────────────────────────────
@@ -178,8 +180,9 @@ def retry(doc_id: str, uid: str = Depends(user_id)):
     if row is None or row["user_id"] != uid:
         raise HTTPException(404, "Document not found.")
     db.set_doc_status(doc_id, "pending", error=None)
-    flow_run_id = jobs.enqueue_document(doc_id, uid)
-    return {"doc_id": doc_id, "status": "pending", "flow_run_id": flow_run_id}
+    threading.Thread(target=jobs.enqueue_document, args=(doc_id, uid),
+                     daemon=True).start()
+    return {"doc_id": doc_id, "status": "pending"}
 
 
 _CONTENT_TYPES = {".pdf": "application/pdf",
