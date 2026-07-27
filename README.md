@@ -161,7 +161,9 @@ python -m src.seed                        # one-shot: index the 4 samples
 2. **Upload** — the browser PUTs the file straight to the bucket.
 3. **Register** — `POST /api/videos {video_id, key}`. The API HEAD-verifies
    the object (exists, size, key prefix belongs to this user), writes a
-   `pending` row, schedules a Prefect run, returns `202` instantly.
+   `pending` row, fires off Prefect scheduling in a **background thread**
+   (so the round-trip to Prefect Cloud doesn't block the response), and
+   returns `202` in ~200ms.
 4. **Worker** (per video, `WORKER_CONCURRENCY` at a time):
    - **fetch** — stream from the bucket (or yt-dlp for YouTube), `sha256` it;
      a duplicate `(user_id, source_hash)` marks the row `skipped` and stops.
@@ -564,6 +566,28 @@ the four entrypoints as top-level modules in the package.
         ├── vector_store.py  multi-tenant Qdrant: visual + text collections, int8/on-disk
         └── search.py        2-branch retrieve → RRF fusion/scoring → gate → cited answer
 ```
+
+## Eval suite
+
+`eval/run_evals.py` runs 31 automated evaluations against a live API (default
+`http://localhost:8000`). Requires a running stack (`docker compose up` or bare
+processes). Uses an isolated `eval_runner` user and cleans up after itself.
+
+```bash
+python eval/run_evals.py
+```
+
+Four categories:
+
+| Category | Count | What it covers |
+|---|---|---|
+| **API contracts** | 14 | Health, config, list/404/400/415/413, file serving, presign, register 202 |
+| **Ingest pipeline** | 5 | PDF paper, PPTX deck, MP4 video, CRUD lifecycle, duplicate detection |
+| **Search functional** | 9 | P@5, MRR, cross-source ranking, recall@10, grounded responses, citation completeness, multi-source fusion, score ordering |
+| **Performance** | 3 | Idle search latency, search during ingest, accept latency p95 |
+
+KPIs tracked: **P@5 ≥ 0.6**, **MRR ≥ 0.5**, **recall@10 ≥ 0.8**, **accept
+latency p95 < 500ms**, **search/ingest ratio > 10×**.
 
 ## Security notes (presigned uploads)
 
