@@ -64,6 +64,7 @@ One Docker image, four entrypoints (the command picks which): API, worker, CLIP 
 | `src/llm.py` | Provider-agnostic vision LLM (OpenAI-compat/NVIDIA/Anthropic) |
 | `src/api/videos.py` | Video write path: presign, register, status, retry, delete |
 | `src/api/documents.py` | Document write path: presign, register, status, file serving |
+| `src/api/admin.py` | Unified /admin/sources — cross-type listing, get, delete |
 | `src/api/search.py` | Read path: /api/ask, /api/llm, config, media, UI |
 | `ui/index.html` | Single-file frontend — no build step, no framework |
 

@@ -359,6 +359,44 @@ def eval_api_contracts():
         record("Document register → 202", "api", False,
                f"presign failed: {r_pre.status_code}")
 
+    # 1.15 Admin sources endpoint — unified listing
+    r = api("GET", "/admin/sources", user=DEFAULT_USER)
+    if r.status_code == 200:
+        body = r.json()
+        has_sources = "sources" in body and "count" in body
+        record("Admin /admin/sources (200)", "api", has_sources,
+               f"count={body.get('count', '?')}")
+    else:
+        record("Admin /admin/sources (200)", "api", False,
+               f"got {r.status_code}")
+
+    # 1.16 Admin sources type filter
+    r = api("GET", "/admin/sources?type=video", user=DEFAULT_USER)
+    if r.status_code == 200:
+        body = r.json()
+        all_video = all(s["type"] == "video" for s in body.get("sources", []))
+        record("Admin sources type=video filter", "api",
+               all_video, f"count={body.get('count', '?')}")
+    else:
+        record("Admin sources type=video filter", "api", False,
+               f"got {r.status_code}")
+
+    # 1.17 Admin get single source
+    r = api("GET", "/admin/sources", user=DEFAULT_USER)
+    if r.status_code == 200 and r.json().get("sources"):
+        src = r.json()["sources"][0]
+        r2 = api("GET", f"/admin/sources/{src['id']}", user=DEFAULT_USER)
+        record("Admin get source by ID", "api",
+               r2.status_code == 200 and r2.json().get("id") == src["id"],
+               f"id={src['id']}")
+    else:
+        record("Admin get source by ID", "api", False, "no sources", skipped=True)
+
+    # 1.18 Admin missing source → 404
+    r = api("GET", "/admin/sources/nonexistent_xyz", user=DEFAULT_USER)
+    record("Admin missing source → 404", "api", r.status_code == 404,
+           f"got {r.status_code}")
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CATEGORY 2: INGEST PIPELINE EVALS
@@ -810,6 +848,8 @@ def print_report():
         ("Retrieval quality & grounding (15 pts)",
          kpis.get("recall_at_10", 0) >= SLA["recall_at_10"] and
          kpis.get("precision_at_5", 0) >= KPI["precision_at_5"]),
+        ("Unified /admin/sources endpoint (15 pts)",
+         any(r.passed for r in RESULTS if "Admin /admin/sources" in r.name)),
         ("Deploy & docs (10 pts)", True),  # assessed manually
     ]
     for criterion, met in rubric:

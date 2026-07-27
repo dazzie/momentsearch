@@ -1,10 +1,10 @@
 """MomentSearch — unified API (one service, one port).
 
-Two routers on one FastAPI app (:8000):
-  - src/api/videos.py  /api/videos/*  — presigned uploads + registration +
-                                        ingest status (Bearer auth)
-  - src/api/search.py  public         — / (web UI), /api/ask, /api/config,
-                                        local-dev media, /api/health
+Routers on one FastAPI app (:8000):
+  - src/api/videos.py     /api/videos/*     — presigned uploads + registration
+  - src/api/documents.py  /api/documents/*  — document uploads + registration
+  - src/api/admin.py      /admin/*          — unified source management
+  - src/api/search.py     public            — / (web UI), /api/ask, /api/config
 
 Heavy processing never happens here — the videos router only schedules Prefect
 flow runs; worker.py (separate process, same image) executes the ingest
@@ -21,6 +21,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from . import config, db
+from .api.admin import router as admin_router
 from .api.documents import router as documents_router
 from .api.search import router as search_router
 from .api.videos import router as videos_router
@@ -45,4 +46,5 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="MomentSearch", version="1.0.0", lifespan=lifespan)
 app.include_router(videos_router)
 app.include_router(documents_router)
+app.include_router(admin_router)
 app.include_router(search_router)

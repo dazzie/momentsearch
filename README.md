@@ -512,6 +512,21 @@ curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8000/api/docume
 curl localhost:8000/api/documents/doc_ab12cd34ef/file   # serves the original PDF/PPTX
 ```
 
+### Admin endpoints (unified source management)
+
+```bash
+# list all sources (videos + documents), newest first
+curl -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8000/admin/sources
+
+# filter by type
+curl -H "Authorization: Bearer $ADMIN_TOKEN" "localhost:8000/admin/sources?type=video"
+curl -H "Authorization: Bearer $ADMIN_TOKEN" "localhost:8000/admin/sources?type=document"
+
+# get / delete a single source by ID
+curl -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8000/admin/sources/up_ab12cd34ef
+curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8000/admin/sources/doc_ab12cd34ef
+```
+
 Public: `GET /` (sample UI) · `GET /get-started` · `GET /api/config` ·
 `GET /api/health`.
 
@@ -550,6 +565,7 @@ the four entrypoints as top-level modules in the package.
     ├── api/
     │   ├── videos.py        write path: presign, register, status, retry, delete
     │   ├── documents.py     document write path: presign, register, status, file serving
+    │   ├── admin.py         unified /admin/sources — cross-type list, get, delete
     │   └── search.py        read path: /api/ask, /api/llm, config, media, UI
     ├── dispatcher.py        WFQ: fair round-robin admission of pending videos
     ├── ingest/
