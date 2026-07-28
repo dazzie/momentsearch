@@ -110,16 +110,23 @@ class RegisterRequest(BaseModel):
     kind: str | None = None  # paper | deck — auto-detected from extension if omitted
 
 
+def _verify_and_enqueue(doc_id: str, key: str, uid: str) -> None:
+    """Background: HEAD-verify the upload landed, then schedule ingest."""
+    meta = storage.head(key)
+    if meta is None:
+        db.set_doc_status(doc_id, "failed", error="Object not found in storage")
+        return
+    if meta["size"] > MAX_UPLOAD_MB * 1024 * 1024:
+        storage.delete_key(key)
+        db.set_doc_status(doc_id, "failed", error=f"Object exceeds {MAX_UPLOAD_MB}MB limit")
+        return
+    jobs.enqueue_document(doc_id, uid)
+
+
 @router.post("", status_code=202, dependencies=[Depends(require_auth)])
 def register(req: RegisterRequest, uid: str = Depends(user_id)):
     if not req.key.startswith(f"{DOC_KEY_PREFIX}{uid}/{req.doc_id}"):
         raise HTTPException(403, "Key does not belong to this user/upload.")
-    meta = storage.head(req.key)
-    if meta is None:
-        raise HTTPException(404, "Object not found — did the upload finish?")
-    if meta["size"] > MAX_UPLOAD_MB * 1024 * 1024:
-        storage.delete_key(req.key)
-        raise HTTPException(413, f"Object exceeds the {MAX_UPLOAD_MB}MB limit.")
 
     ext = Path(req.key).suffix.lower()
     kind = req.kind or _KIND_MAP.get(ext, "paper")
@@ -134,8 +141,8 @@ def register(req: RegisterRequest, uid: str = Depends(user_id)):
         "storage_key": req.key, "source_hash": None,
     })
 
-    threading.Thread(target=jobs.enqueue_document, args=(row["id"], uid),
-                     daemon=True).start()
+    threading.Thread(target=_verify_and_enqueue,
+                     args=(row["id"], req.key, uid), daemon=True).start()
     return {"doc_id": row["id"], "status": row["status"]}
 
 

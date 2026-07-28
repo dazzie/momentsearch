@@ -70,6 +70,11 @@ def _fuse(visual_hits: list[dict], text_hits: list[dict]) -> list[dict]:
                    (w["text"]["rrf"] if w["text"] else 0.0)
         if {"frame", "text"} <= w["modalities"]:
             w["rrf"] *= CROSS_MODAL_BOOST
+        elif w["text"] and (w["text"].get("kind") in ("paper", "deck")):
+            # Documents are text-only by nature — compensate for BOTH the missing
+            # visual branch (×2) and the missing cross-modal agreement (×boost)
+            # so a top-ranked document ties a top-ranked cross-modal video match.
+            w["rrf"] *= 2 * CROSS_MODAL_BOOST
     windows.sort(key=lambda w: w["rrf"], reverse=True)
     return windows
 

@@ -24,11 +24,10 @@ def pool() -> ConnectionPool:
     fork gets a fresh pool."""
     global _pool, _pool_pid
     if _pool is None or _pool_pid != os.getpid():
-        # check= pings each connection before lending it out — Neon silently
-        # drops idle SSL connections, which otherwise 500s the first request
-        # after a quiet period.
+        # reconnect= handles Neon silently dropping idle SSL connections —
+        # the pool retries with a fresh connection instead of raising.
         _pool = ConnectionPool(DATABASE_URL, min_size=1, max_size=5,
-                               check=ConnectionPool.check_connection,
+                               reconnect_timeout=5,
                                kwargs={"row_factory": dict_row})
         _pool_pid = os.getpid()
     return _pool
