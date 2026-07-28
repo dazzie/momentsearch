@@ -101,7 +101,8 @@ def ingest_document(doc_id: str, user_id: str) -> dict:
     try:
         row = db.get_document(doc_id)
         if row is None:
-            raise ValueError(f"no manifest row for {doc_id}")
+            print(f"[ingest-doc] {doc_id} skipped (row deleted before worker ran)")
+            return {"doc_id": doc_id, "skipped": True}
         kind = row["kind"]
 
         path = t_fetch_doc(doc_id, user_id)

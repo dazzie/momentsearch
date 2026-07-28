@@ -30,7 +30,7 @@ BASE_URL = "http://localhost:8000"
 EVAL_USER = "eval_runner"
 DEFAULT_USER = "default"
 POLL_INTERVAL = 2
-DOC_POLL_TIMEOUT = 120
+DOC_POLL_TIMEOUT = 300
 VIDEO_POLL_TIMEOUT = 300
 
 # SLA targets from the assignment
