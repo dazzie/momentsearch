@@ -17,10 +17,11 @@ from __future__ import annotations
 import argparse
 import io
 import json
-import statistics
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
+from pathlib import Path
 
 import requests
 
@@ -490,7 +491,7 @@ def resilience_sse_stream():
 # REPORT
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def print_report(results, resilience=False):
+def print_report(results, resilience=False, concurrency=CONCURRENCY, rounds=SEARCH_ROUNDS):
     print("\n" + "=" * 70)
     print("BENCHMARK SUMMARY")
     print("=" * 70)
@@ -510,6 +511,7 @@ def print_report(results, resilience=False):
     if al.get("latencies"):
         print(f"  Accept p95:          {percentile(al['latencies'], 95):.0f} ms")
 
+    resilience_results = {}
     if resilience:
         print(f"\n  Resilience tests:")
         for key in ("search_during_ingest", "burst_register",
@@ -527,9 +529,47 @@ def print_report(results, resilience=False):
                 ok = r.get("ok", False)
             else:
                 ok = False
+            resilience_results[key] = ok
             print(f"    {key:30s} {'PASS' if ok else 'FAIL'}")
 
     print("=" * 70)
+
+    # Save JSON report
+    now = datetime.now(timezone.utc)
+    report = {
+        "timestamp": now.isoformat(),
+        "date": now.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "base_url": BASE_URL,
+        "config": {"concurrency": concurrency, "rounds": rounds,
+                    "resilience": resilience},
+        "search_latency": {
+            "p50_ms": percentile(sl.get("latencies", []), 50),
+            "p95_ms": percentile(sl.get("latencies", []), 95),
+            "p99_ms": percentile(sl.get("latencies", []), 99),
+            "min_ms": min(sl["latencies"]) if sl.get("latencies") else None,
+            "max_ms": max(sl["latencies"]) if sl.get("latencies") else None,
+            "errors": sl.get("errors", 0),
+        },
+        "accept_latency": {
+            "p50_ms": percentile(al.get("latencies", []), 50),
+            "p95_ms": percentile(al.get("latencies", []), 95),
+            "samples": len(al.get("latencies", [])),
+            "pass": percentile(al.get("latencies", []), 95) < 500,
+        },
+        "throughput": {
+            "qps": tp.get("qps", 0),
+            "wall_s": tp.get("wall_s", 0),
+            "errors": tp.get("errors", 0),
+        },
+    }
+    if resilience:
+        report["resilience"] = resilience_results
+
+    reports_dir = Path(__file__).resolve().parent.parent / "reports"
+    reports_dir.mkdir(exist_ok=True)
+    report_path = reports_dir / f"bench_{now.strftime('%Y%m%d_%H%M%S')}.json"
+    report_path.write_text(json.dumps(report, indent=2, default=str))
+    print(f"\nReport saved to {report_path}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -582,7 +622,8 @@ def main():
         results["sse_stream"] = resilience_sse_stream()
 
     cleanup()
-    print_report(results, resilience=args.resilience)
+    print_report(results, resilience=args.resilience,
+                 concurrency=args.concurrency, rounds=args.rounds)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@
 
 Runs against a live stack. Creates test fixtures under an isolated user,
 cleans up after itself, and prints a structured report with KPIs.
+Saves a JSON report to reports/eval_YYYYMMDD_HHMMSS.json.
 """
 from __future__ import annotations
 
@@ -18,6 +19,7 @@ import tempfile
 import time
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -877,6 +879,30 @@ def print_report():
 
     print(f"\nRESULT: {passed}/{total} passed, {failed} failed, {skipped} skipped")
     print("=" * 70)
+
+    # Save JSON report
+    now = datetime.now(timezone.utc)
+    report = {
+        "timestamp": now.isoformat(),
+        "date": now.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "base_url": BASE_URL,
+        "summary": {"passed": passed, "failed": failed, "skipped": skipped,
+                     "total": total},
+        "kpis": kpis,
+        "rubric": {c: m for c, m in rubric},
+        "results": [
+            {"name": r.name, "category": r.category, "passed": r.passed,
+             "detail": r.detail, "latency_s": r.latency_s,
+             "kpi_name": r.kpi_name, "kpi_value": r.kpi_value,
+             "skipped": r.skipped}
+            for r in RESULTS
+        ],
+    }
+    reports_dir = Path(__file__).resolve().parent.parent / "reports"
+    reports_dir.mkdir(exist_ok=True)
+    report_path = reports_dir / f"eval_{now.strftime('%Y%m%d_%H%M%S')}.json"
+    report_path.write_text(json.dumps(report, indent=2, default=str))
+    print(f"\nReport saved to {report_path}")
 
     return failed == 0
 
