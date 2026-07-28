@@ -10,7 +10,7 @@
 # fly deploy --ha=false
 # fly scale count worker=2        # more ingest throughput, anytime
 
-app = 'momentsearch'
+app = 'momentsearch-dm'
 primary_region = 'iad'
 
 [build]
@@ -34,7 +34,7 @@ primary_region = 'iad'
   # Fly private networking: <process>.process.<app>.internal resolves to the
   # clip machine. api + worker send embed batches there (one warm model);
   # clip_service itself ignores this and always runs the model locally.
-  CLIP_SERVICE_URL = 'http://clip.process.momentsearch.internal:8001'
+  CLIP_SERVICE_URL = 'http://clip.process.momentsearch-dm.internal:8001'
 
 # Infra backstop: if a machine's process ever exits (crash, OOM, a dependency
 # outage that slips past the code's own retry loop), always bring it back —
