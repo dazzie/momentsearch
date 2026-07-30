@@ -26,9 +26,11 @@ qdrant_storage/
 node_modules/
 dist/
 
-# Benchmark and eval report output
+# Benchmark and eval report output (final report is tracked)
 benchmark/*.json
 benchmark/*.csv
+reports/*
+!reports/eval_20260728_085908.json
 
 # Internal design notes (not published)
 MULTIMODAL_RETRIEVAL.md
