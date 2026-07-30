@@ -29,7 +29,6 @@ dist/
 # Benchmark and eval report output
 benchmark/*.json
 benchmark/*.csv
-reports/
 
 # Internal design notes (not published)
 MULTIMODAL_RETRIEVAL.md

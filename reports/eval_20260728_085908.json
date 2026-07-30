@@ -1,0 +1,395 @@
+{
+  "timestamp": "2026-07-28T08:59:08.180964+00:00",
+  "date": "2026-07-28 08:59:08 UTC",
+  "base_url": "https://momentsearch-dm.fly.dev",
+  "summary": {
+    "passed": 36,
+    "failed": 0,
+    "skipped": 0,
+    "total": 36
+  },
+  "kpis": {
+    "pdf_chunks": 1,
+    "pptx_chunks": 4,
+    "mp4_frames": 1,
+    "precision_at_5": 0.7333333333333334,
+    "mrr": 1.0,
+    "recall_at_10": 1.0,
+    "abstention_rate": 1.0,
+    "vid_cite_completeness": 1.0,
+    "doc_cite_completeness": 1.0,
+    "idle_search_p95": 1.214155912399292,
+    "search_ingest_ratio": 1.0001046629196164,
+    "accept_latency_p95": 243.51811408996582
+  },
+  "rubric": {
+    "Search lights up cross-source (15 pts)": true,
+    "Multi-format ingestion (25 pts)": true,
+    "Queue & decoupling (20 pts)": true,
+    "Retrieval quality & grounding (15 pts)": true,
+    "Unified /admin/sources endpoint (15 pts)": true,
+    "Deploy & docs (10 pts)": true
+  },
+  "results": [
+    {
+      "name": "Health endpoint",
+      "category": "api",
+      "passed": true,
+      "detail": "status=200",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Config endpoint",
+      "category": "api",
+      "passed": true,
+      "detail": "fields=ok",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "List videos (200)",
+      "category": "api",
+      "passed": true,
+      "detail": "",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "List documents (200)",
+      "category": "api",
+      "passed": true,
+      "detail": "",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Missing video \u2192 404",
+      "category": "api",
+      "passed": true,
+      "detail": "got 404",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Missing document \u2192 404",
+      "category": "api",
+      "passed": true,
+      "detail": "got 404",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Empty question \u2192 400",
+      "category": "api",
+      "passed": true,
+      "detail": "got 400",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Invalid doc type \u2192 415",
+      "category": "api",
+      "passed": true,
+      "detail": "got 415",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Invalid video type \u2192 415",
+      "category": "api",
+      "passed": true,
+      "detail": "got 415",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Oversized doc \u2192 413",
+      "category": "api",
+      "passed": true,
+      "detail": "got 413",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Document file serving",
+      "category": "api",
+      "passed": true,
+      "detail": "status=200 ct=application/pdf",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Sample video delete \u2192 403",
+      "category": "api",
+      "passed": true,
+      "detail": "got 403",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Document presign \u2192 200",
+      "category": "api",
+      "passed": true,
+      "detail": "got 200",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Document register \u2192 202",
+      "category": "api",
+      "passed": true,
+      "detail": "status=202 latency=456ms",
+      "latency_s": 0.4557161331176758,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Admin /admin/sources (200)",
+      "category": "api",
+      "passed": true,
+      "detail": "count=12",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Admin sources type=video filter",
+      "category": "api",
+      "passed": true,
+      "detail": "count=6",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Admin get source by ID",
+      "category": "api",
+      "passed": true,
+      "detail": "id=yt_Ot582-E61ac",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Admin missing source \u2192 404",
+      "category": "api",
+      "passed": true,
+      "detail": "got 404",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "SSE /api/ask_stream",
+      "category": "api",
+      "passed": true,
+      "detail": "events=['citations', 'token', 'done']",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "PDF paper ingest",
+      "category": "ingest",
+      "passed": true,
+      "detail": "status=indexed chunks=1 path=pending\u2192parsing\u2192embedding\u2192indexed",
+      "latency_s": 80.69020700454712,
+      "kpi_name": "pdf_chunks",
+      "kpi_value": 1,
+      "skipped": false
+    },
+    {
+      "name": "PPTX deck ingest",
+      "category": "ingest",
+      "passed": true,
+      "detail": "status=indexed chunks=4 (expected 4) path=pending\u2192parsing\u2192embedding\u2192indexed",
+      "latency_s": 25.35222601890564,
+      "kpi_name": "pptx_chunks",
+      "kpi_value": 4,
+      "skipped": false
+    },
+    {
+      "name": "MP4 video ingest",
+      "category": "ingest",
+      "passed": true,
+      "detail": "status=indexed frames=1 path=pending\u2192queued\u2192fetching\u2192embedding\u2192indexed",
+      "latency_s": 27.927000284194946,
+      "kpi_name": "mp4_frames",
+      "kpi_value": 1,
+      "skipped": false
+    },
+    {
+      "name": "Document CRUD lifecycle",
+      "category": "ingest",
+      "passed": true,
+      "detail": "get=200 del=200 gone=404",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Duplicate detection",
+      "category": "ingest",
+      "passed": true,
+      "detail": "dup=not detected (both indexed)",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Precision@5 (video queries)",
+      "category": "search",
+      "passed": true,
+      "detail": "P@5=0.73 (target \u22650.6)",
+      "latency_s": 0.0,
+      "kpi_name": "precision_at_5",
+      "kpi_value": 0.7333333333333334,
+      "skipped": false
+    },
+    {
+      "name": "MRR (video queries)",
+      "category": "search",
+      "passed": true,
+      "detail": "MRR=1.00 (target \u22650.5)",
+      "latency_s": 0.0,
+      "kpi_name": "mrr",
+      "kpi_value": 1.0,
+      "skipped": false
+    },
+    {
+      "name": "Cross-source ranking",
+      "category": "search",
+      "passed": true,
+      "detail": "3/3 queries found documents in top-10",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Cross-source recall@10",
+      "category": "search",
+      "passed": true,
+      "detail": "recall@10=1.00 (target \u22650.7)",
+      "latency_s": 0.0,
+      "kpi_name": "recall_at_10",
+      "kpi_value": 1.0,
+      "skipped": false
+    },
+    {
+      "name": "Grounded response on irrelevant queries",
+      "category": "search",
+      "passed": true,
+      "detail": "gated 5/5 = 100% (target \u226580%)",
+      "latency_s": 0.0,
+      "kpi_name": "abstention_rate",
+      "kpi_value": 1.0,
+      "skipped": false
+    },
+    {
+      "name": "Video citation completeness",
+      "category": "search",
+      "passed": true,
+      "detail": "100%",
+      "latency_s": 0.0,
+      "kpi_name": "vid_cite_completeness",
+      "kpi_value": 1.0,
+      "skipped": false
+    },
+    {
+      "name": "Document citation completeness",
+      "category": "search",
+      "passed": true,
+      "detail": "100%",
+      "latency_s": 0.0,
+      "kpi_name": "doc_cite_completeness",
+      "kpi_value": 1.0,
+      "skipped": false
+    },
+    {
+      "name": "Multi-source fusion",
+      "category": "search",
+      "passed": true,
+      "detail": "kinds=['deck', 'video']",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Citations ranked by score",
+      "category": "search",
+      "passed": true,
+      "detail": "scores=[0.0469, 0.0467, 0.0462, 0.046, 0.0439]",
+      "latency_s": 0.0,
+      "kpi_name": "",
+      "kpi_value": 0.0,
+      "skipped": false
+    },
+    {
+      "name": "Idle search latency (baseline)",
+      "category": "perf",
+      "passed": true,
+      "detail": "p95=1.21s",
+      "latency_s": 1.214155912399292,
+      "kpi_name": "idle_search_p95",
+      "kpi_value": 1.214155912399292,
+      "skipped": false
+    },
+    {
+      "name": "Search latency during ingest",
+      "category": "perf",
+      "passed": true,
+      "detail": "p95=1.21s ratio=1.00\u00d7 (target \u22641.3\u00d7)",
+      "latency_s": 1.2142829895019531,
+      "kpi_name": "search_ingest_ratio",
+      "kpi_value": 1.0001046629196164,
+      "skipped": false
+    },
+    {
+      "name": "Accept latency p95 (20 samples)",
+      "category": "perf",
+      "passed": true,
+      "detail": "p95=423ms median=244ms (target \u2264300ms) rtt=234ms",
+      "latency_s": 0.0,
+      "kpi_name": "accept_latency_p95",
+      "kpi_value": 243.51811408996582,
+      "skipped": false
+    }
+  ]
+}
