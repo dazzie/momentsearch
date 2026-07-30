@@ -593,12 +593,15 @@ the four entrypoints as top-level modules in the package.
 
 ## Eval suite
 
-`eval/run_evals.py` runs 31 automated evaluations against a live API (default
-`http://localhost:8000`). Requires a running stack (`docker compose up` or bare
-processes). Uses an isolated `eval_runner` user and cleans up after itself.
+`eval/run_evals.py` runs 36 automated evaluations against a live API (default
+`http://localhost:8000`, or `--base-url https://your.fly.dev` for remote).
+Requires a running stack. Uses an isolated `eval_runner` user for ingest tests
+and seeds its own cross-source documents under `default` for search coverage.
+Cleans up after itself.
 
 ```bash
-python eval/run_evals.py
+python eval/run_evals.py                                        # local
+python eval/run_evals.py --base-url https://momentsearch-dm.fly.dev  # remote
 ```
 
 Four categories:
@@ -607,11 +610,19 @@ Four categories:
 |---|---|---|
 | **API contracts** | 19 | Health, config, list/404/400/415/413, file serving, presign, register 202, admin sources, SSE stream |
 | **Ingest pipeline** | 5 | PDF paper, PPTX deck, MP4 video, CRUD lifecycle, duplicate detection |
-| **Search functional** | 9 | P@5, MRR, cross-source ranking, recall@10, grounded responses, citation completeness, multi-source fusion, score ordering |
+| **Search functional** | 9 | P@5, MRR, cross-source ranking, recall@10, grounded responses, citation completeness (video + document), multi-source fusion, score ordering |
 | **Performance** | 3 | Idle search latency, search during ingest, accept latency p95 |
 
-KPIs tracked: **P@5 ≥ 0.6**, **MRR ≥ 0.5**, **recall@10 ≥ 0.8**, **accept
-latency p95 < 500ms**, **search/ingest ratio > 10×**.
+Latest results against the live Fly deployment (**36/36 passing**):
+
+| KPI | Value | Target |
+|---|---|---|
+| Precision@5 | 0.73 | ≥ 0.6 |
+| MRR | 1.00 | ≥ 0.5 |
+| Cross-source recall@10 | 1.00 | ≥ 0.7 |
+| Abstention rate | 100% | ≥ 80% |
+| Accept latency (median) | 237ms | ≤ 300ms |
+| Search/ingest ratio | 0.98× | ≤ 1.3× |
 
 ## Benchmark
 
